@@ -23,13 +23,9 @@ import collections
 import logging
 import warnings
 
-import matplotlib.pyplot as plt
 import numpy as np
 from pylds.models import DefaultLDS
 from scipy.stats import ortho_group
-import seaborn as sns
-from statsmodels import api as sm_api
-from statsmodels.tools import sm_exceptions
 
 
 class LinearDynamicalSystem(object):
@@ -81,74 +77,6 @@ class LinearDynamicalSystemSequence(object):
     self.outputs = output_seq
     self.input_dim = np.shape(input_seq)[1]
     self.output_dim = np.shape(output_seq)[1]
-
-  def plot(self, input_colors=None, output_colors=None, output_only=False):
-    """Plots the sequence in seaborn lineplot.
-
-    Args:
-      input_colors: A list of strings, optional.
-      output_colors: A list of strings, optional.
-      output_only: Whether to only plot output.
-    """
-    plt.figure(figsize=(10, 6))
-    if not output_only:
-      for i in range(self.input_dim):
-        c = input_colors[i] if input_colors else None
-        sns.lineplot(
-            np.arange(self.seq_len),
-            self.inputs[:, i],
-            label='input_' + str(i),
-            alpha=0.5,
-            color=c)
-    for i in range(self.output_dim):
-      c = output_colors[i] if output_colors else None
-      sns.lineplot(
-          np.arange(self.seq_len),
-          self.outputs[:, i],
-          label='output_' + str(i),
-          color=c)
-    plt.title('Generated Sequence')
-
-  def get_pred_error(self, predictions, num_warm_start_steps, relative=True):
-    if num_warm_start_steps != self.seq_len - np.shape(predictions)[0]:
-      raise ValueError('Sequence length mismatch.')
-    err = np.linalg.norm(self.outputs[num_warm_start_steps:] - predictions)
-    if relative:
-      return err / np.linalg.norm(self.outputs[num_warm_start_steps:])
-    else:
-      return err
-
-  def plot_pred(self,
-                predictions,
-                num_warm_start_steps,
-                plot_error=False,
-                seq_colors=None,
-                pred_colors=None):
-    """Plots predictions vs ground truth.
-
-    Args:
-      predictions: A numpy array of length self.seq_len - num_warm_start_steps.
-      num_warm_start_steps: Number of steps before generating predictions.
-      plot_error: Whether to plot errors.
-      seq_colors: A list of strings, optional.
-      pred_colors: A list of strings, optional.
-    """
-    self.plot(output_colors=seq_colors, output_only=True)
-    for i in range(self.output_dim):
-      c = pred_colors[i] if pred_colors else None
-      sns.lineplot(
-          np.arange(num_warm_start_steps, self.seq_len),
-          predictions[:, i],
-          label='pred_' + str(i),
-          color=c)
-      if plot_error:
-        sns.lineplot(
-            np.arange(num_warm_start_steps, self.seq_len),
-            predictions[:, i] - self.outputs[num_warm_start_steps:, i],
-            label='error_' + str(i),
-            color='black')
-    plt.title('Predictions, relative error: ' +
-              str(self.get_pred_error(predictions, num_warm_start_steps)))
 
 
 class SequenceGenerator(object):
@@ -253,144 +181,6 @@ def generate_linear_dynamical_system(hidden_state_dim,
   input_matrix = np.random.rand(hidden_state_dim, input_dim)
   output_matrix = np.random.rand(output_dim, hidden_state_dim)
   return LinearDynamicalSystem(transition_matrix, input_matrix, output_matrix)
-
-
-def eig_dist(system1, system2):
-  """Computes the eigenvalue distance between two LDS's.
-
-  Args:
-    system1: A LinearDynamicalSystem object.
-    system2: A LinearDynamicalSystem object.
-
-  Returns:
-    Frobenious norm between ordered eigenvalues.
-  """
-  return np.linalg.norm(system1.get_spectrum() - system2.get_spectrum())
-
-
-class LinearDynamicalSystemMLEModel(sm_api.tsa.statespace.MLEModel):
-  """Class for MLE Model for linear dynamical system.
-
-  For more details on the parameters, see
-  https://www.statsmodels.org/dev/generated/
-  statsmodels.tsa.statespace.representation.Representation.html
-  """
-
-  def __init__(self, endog, k_states, exog=None):
-    """Initializes the MLE model.
-
-    Args:
-      endog: The observed sequences of shape [n_obs, obs_dim].
-      k_states: Hidden state dim.
-      exog: Exogenous variables to include in the model.
-    """
-    endog = endog.reshape((-1, 1))
-    super(LinearDynamicalSystemMLEModel, self).__init__(
-        endog, k_states, exog, initialization='stationary')
-    self['selection'] = np.eye(k_states)
-    self.param_shape_dict = collections.OrderedDict()
-    # We assume the transition matrix is diagonal with stable real eigenvalues.
-    # Here the variable contains the eigenvalues, and we translate that into
-    # the transition matrix in the update function.
-    self.param_shape_dict['transition'] = (self.k_states)
-    self.param_shape_dict['design'] = (1, self.k_states, 1)
-    self.param_shape_dict['obs_cov'] = (1, 1, 1)
-    self.param_shape_dict['state_intercept'] = (self.k_states, 1)
-    self.param_shape_dict['obs_intercept'] = (1, 1)
-    # We assume that all state dimensions have equal var and no cov.
-    self.param_shape_dict['state_cov'] = (1)
-    self.total_param_len = sum(
-        [np.prod(s) for s in self.param_shape_dict.values()])
-
-  def _sigmoid(self, x):
-    return 1. / (1. + np.exp(-x))
-
-  def _inverse_sigmoid(self, y):
-    return np.log(y / (1. - y))
-
-  def transform_params(self, unconstrained):
-    """Transform unconstrained parameters used by the optimizer to constrained.
-
-    Args:
-      unconstrained: Array of unconstrained parameters used by the optimizer, to
-        be transformed.
-
-    Returns:
-      Array of constrained parameters which may be used in likelihood evalation.
-    """
-    constrained = np.copy(unconstrained)
-    param_ind = 0
-    for k, s in self.param_shape_dict.iteritems():
-      if k == 'transition':
-        # Constrain the eigenvalues of transition matrix to between -1 and 1.
-        # Map the real line to (-1, 1) by sigmoid(x) * 2 - 1.
-        constrained[param_ind:param_ind + int(np.prod(s))] = self._sigmoid(
-            unconstrained[param_ind:param_ind + int(np.prod(s))]) * 2. - 1.
-      if k == 'state_cov' or k == 'obs_cov':
-        assert np.prod(s) == 1
-        # Constrain covariance to be positive by taking exponent.
-        constrained[param_ind] = np.exp(unconstrained[param_ind])
-      param_ind += np.prod(s)
-    return np.array(constrained, ndmin=1)
-
-  def untransform_params(self, constrained):
-    """Transform unconstrained parameters used by the optimizer to constrained.
-
-    Args:
-      constrained: Array of transformed constrained parameters.
-
-    Returns:
-      Array of unconstrained parameters used by the optimizer.
-    """
-    unconstrained = np.copy(constrained)
-    # Constrain the eigenvalues of the transition matrix to be between -1 and 1.
-    param_ind = 0
-    for k, s in self.param_shape_dict.iteritems():
-      if k == 'transition':
-        # Inverse of mapping the real line to (-1, 1) by sigmoid(x) * 2 - 1.
-        # The inverse is x = inverse_sigmoid((y + 1) / 2).
-        constrained_eig = constrained[param_ind:param_ind + int(np.prod(s))]
-        unconstrained[param_ind:param_ind + int(np.prod(s))] = (
-            self._inverse_sigmoid((constrained_eig + 1.) / 2.))
-      if k == 'state_cov' or k == 'obs_cov':
-        assert np.prod(s) == 1
-        # Undo constrain covariance to be positive by taking exponent.
-        unconstrained[param_ind] = np.log(constrained[param_ind])
-      param_ind += np.prod(s)
-    return np.array(unconstrained, ndmin=1)
-
-  def update(self, params, transformed=True, **kwargs):
-    """Updates the linear dynamical system params."""
-    params = super(LinearDynamicalSystemMLEModel, self).update(params, **kwargs)
-    param_ind = 0
-    for k, s in self.param_shape_dict.iteritems():
-      if k == 'transition':
-        self[k] = np.diag(params[param_ind:param_ind + int(np.prod(s))])
-      elif k == 'state_cov':
-        assert np.prod(s) == 1
-        state_var = params[param_ind]
-        self[k] = state_var * np.eye(self.k_states).reshape(
-            self.k_states, self.k_states, 1)
-      else:
-        self[k] = params[param_ind:param_ind + int(np.prod(s))].reshape(s)
-      param_ind += np.prod(s)
-
-  @property
-  def start_params(self):
-    """Returns the default start params (transformed)."""
-    start_values_dict = collections.OrderedDict()
-    start_values_dict['transition'] = np.random.uniform(
-        low=-1, high=1, size=(self.k_states))
-    start_values_dict['design'] = np.random.rand(self.k_states).reshape(
-        (1, self.k_states, 1))
-    start_values_dict['obs_cov'] = np.ones((1, 1, 1))
-    start_values_dict['state_intercept'] = 0.1 * np.random.rand(
-        self.k_states).reshape((self.k_states, 1))
-    start_values_dict['obs_intercept'] = 0.1 * np.random.rand(1).reshape((1, 1))
-    start_values_dict['state_cov'] = np.ones((1))
-    assert start_values_dict.keys() == self.param_shape_dict.keys()
-    return np.concatenate([p.flatten() for p in start_values_dict.values()],
-                          axis=0)
 
 
 def fit_lds_pylds(seq, inputs, guessed_dim):
