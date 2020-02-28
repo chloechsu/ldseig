@@ -123,68 +123,48 @@ class SequenceGenerator(object):
     return LinearDynamicalSystemSequence(inputs, hidden_states, outputs)
 
 
-def _generate_stable_symmetric_matrix(hidden_state_dim, eigvalues=None):
-  """Generates a symmetric matrix with spectral radius <= 1.
-
-  Args:
-    hidden_state_dim: Desired dimension.
-    eigvalues: Specified eigenvalues, optional. If None, random eigenvalues will
-      be generated from uniform[-1, 1].
-
-  Returns:
-    A numpy array of shape [hidden_state_dim, hidden_state_dim] represending a
-    symmetric matrix with spectral radius <= 1.
-  """
-  # Generate eigenvalues.
-  if eigvalues is None:
-    eigvalues = np.random.uniform(-1.0, 1.0, hidden_state_dim)
-  diag_matrix = np.diag(eigvalues)
-  if hidden_state_dim == 1:
-    change_of_basis = np.ones([1, 1])
-  else:
-    change_of_basis = ortho_group.rvs(hidden_state_dim)
-  # transition_matrix = change_of_basis diag_matrix change_of_basis^T
-  transition_matrix = np.matmul(
-      np.matmul(change_of_basis, diag_matrix), change_of_basis.transpose())
-  # Check that the transition_matrix has to recover the correct eigvalues.
-  if np.linalg.norm(
-      np.sort(np.linalg.eigvals(transition_matrix)) -
-      np.sort(eigvalues)) > 1e-6:
-    raise ValueError('Eigenvalues do not match.')
-  return transition_matrix
-
-
-def generate_linear_dynamical_system(hidden_state_dim,
-                                     input_dim=1,
-                                     output_dim=1,
-                                     eigvalues=None,
-                                     diagonalizable=True):
-  """Generates a diagonalizable LinearDynamicalSystem with given dimensions.
-
+def generate_linear_dynamical_system(hidden_state_dim, input_dim=1,
+        output_dim=1):
+  """Generates a LinearDynamicalSystem with given dimensions.
   Args:
     hidden_state_dim: Desired hidden state dim.
     input_dim: The input dim.
     output_dim: Desired output dim.
-    eigvalues: Specified eigenvalues, optional. If None, random eigenvalues will
-      be generated from uniform[-1, 1] when diagonalizable = True.
-
   Returns:
     A LinearDynamicalSystem object with
     - A random stable symmetric transition matrx.
     - Identity input matrix.
     - A random output matrix.
   """
-  eigvalues = np.random.uniform(size=hidden_state_dim)
-  # Generate a symmetric transition matrix A.
-  transition_matrix = _generate_stable_symmetric_matrix(
-          hidden_state_dim, eigvalues)
+  spectral_radius = np.inf
+  while spectral_radius > 1.0:
+    transition_matrix = np.random.rand(hidden_state_dim, hidden_state_dim)
+    spectral_radius = np.max(np.abs(np.linalg.eig(transition_matrix)[0]))
   input_matrix = np.random.rand(hidden_state_dim, input_dim)
   output_matrix = np.random.rand(output_dim, hidden_state_dim)
   return LinearDynamicalSystem(transition_matrix, input_matrix, output_matrix)
 
 
+def eig_dist(system1, system2):
+  """Computes the eigenvalue distance between two LDS's.
+  Args:
+    system1: A LinearDynamicalSystem object.
+    system2: A LinearDynamicalSystem object.
+  Returns:
+    Frobenious norm between ordered eigenvalues.
+  """
+  return np.linalg.norm(system1.get_spectrum() - system2.get_spectrum())
+
+
 def fit_lds_pylds(seq, inputs, guessed_dim):
-  """Fits LDS model via Gibbs sampling and EM. Returns fitted eigenvalues."""
+  """Fits LDS model via Gibbs sampling and EM. Returns fitted eigenvalues.
+  Args:
+    seq: A list of LinearDynamicalSystemSequence objects.
+    inputs: A numpy array.
+    guessed_dim: The hidden state dimension to fit.
+  Returns:
+    Eigenvalues in sorted order.
+  """
   if inputs is None:
     model = DefaultLDS(D_obs=1, D_latent=guessed_dim, D_input=0)
   else:

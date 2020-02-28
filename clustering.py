@@ -162,19 +162,21 @@ def generate_lds_clusters(cluster_centers, num_systems, cluster_radius):
   """
   num_clusters = len(cluster_centers)
   cluster_id = np.random.randint(0, num_clusters, num_systems)
-  hidden_state_dim = cluster_centers[0].hidden_state_dim
+  hdim = cluster_centers[0].hidden_state_dim
   for c in cluster_centers:
-    if c.hidden_state_dim != hidden_state_dim:
+    if c.hidden_state_dim != hdim:
       raise ValueError('Hidden state dimension mismatch.')
   generated_systems = []
   dist_to_center = np.zeros(num_systems)
   for i in range(num_systems):
     c = cluster_centers[cluster_id[i]]
-    eigvalues_new = c.get_spectrum() + cluster_radius / np.sqrt(
-        hidden_state_dim) * np.random.randn(hidden_state_dim)
-    generated_systems.append(
-        lds.generate_linear_dynamical_system(
-            hidden_state_dim, eigvalues=eigvalues_new))
+    transition_matrix = c.transition_matrix + cluster_radius / np.sqrt(
+          hdim) * np.random.randn(hdim, hdim)
+    system = lds.LinearDynamicalSystem(
+        transition_matrix,
+        np.random.randn(c.input_matrix.shape[0], c.input_matrix.shape[1]),
+        np.random.randn(c.output_matrix.shape[0], c.output_matrix.shape[1]))
+    generated_systems.append(system)
     dist_to_center[i] = lds.eig_dist(c, generated_systems[-1])
 
   # For logging purpose.
@@ -211,12 +213,13 @@ def get_results(sequences, num_clusters, guessed_hidden_dim, true_cluster_ids):
   """
   cluster_fns = {
       'true': (lambda a, n: true_cluster_ids),
-      'kshape': kshape,
-      'dtw': dtw_kmedoids,
-      'pca': partial(pca_kmeans, hdim=guessed_hidden_dim),
+      #'kshape': kshape,
+      #'dtw': dtw_kmedoids,
+      #'pca': partial(pca_kmeans, hdim=guessed_hidden_dim),
       'ar': partial(ar_kmeans, hdim=guessed_hidden_dim), 
       'arma_iter': partial(arma_iter_kmeans, hdim=guessed_hidden_dim),
-      'lds_em': partial(lds_em_kmeans, hdim=guessed_hidden_dim),
+      #'lds_em': partial(lds_em_kmeans, hdim=guessed_hidden_dim),
+      'arma_mle': partial(arma_mle_kmeans, hdim=guessed_hidden_dim),
   }
   metric_fns_with_truth = {
       'adj_rand_score':

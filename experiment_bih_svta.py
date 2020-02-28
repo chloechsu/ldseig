@@ -16,9 +16,8 @@
 r"""Script for running experiments.
 
 Example to run locally:
-python bih.py --output_dir=bih_may21 --channel=both\
-    --hdim=3 --num_clusters=2
-The outputs will show up in output_dir ucr_may19.
+python experiment_mit_bih.py --output_dir=bih --channel=both  --hdim=3 --num_clusters=2
+The outputs will show up in output_dir bih.
 """
 
 from __future__ import absolute_import
@@ -28,12 +27,11 @@ from __future__ import print_function
 import collections
 import os
 
-# pylint: disable=g-bad-import-order
 from absl import app
 from absl import flags
 import matplotlib
 matplotlib.use('Agg')
-from matplotlib import pylab  # pylint: disable=g-import-not-at-top
+from matplotlib import pylab 
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -100,7 +98,6 @@ def create_model_fns(hdim):
   model_fns = collections.OrderedDict()
   # Using raw outputs.
   # model_fns['raw_output'] = lambda s: _replace_nan_with_0(s.outputs)
-  # pylint: disable=g-long-lambda
   # Pure AR.
   model_fns['AR'] = lambda s: arma.fit_ar(s.outputs, None, hdim)
   # Iterated regression without regularization and with regularization.
@@ -173,7 +170,7 @@ def parse_examples_to_seq(hdim, pos_samples=25, neg_samples=25):
 
 def _subsample_rows(arr, step_size):
   return np.concatenate(
-      [arr[j:j + 1, :] for j in xrange(0, arr.shape[0], step_size)], axis=0)
+      [arr[j:j + 1, :] for j in range(0, arr.shape[0], step_size)], axis=0)
 
 
 def subsample(sequences, step_size=5):
@@ -194,7 +191,6 @@ def get_results_bih_dataset(hdim, num_clusters, pos_samples=25, neg_samples=25):
   padded = clustering.pad_seqs_to_matrix(seqs)
   max_seq_len = np.max([s.seq_len for s in seqs])
   pca = sklearn.decomposition.PCA(n_components=hdim).fit(padded)
-  # pylint: disable=g-long-lambda
   model_fns['PCA'] = lambda s: pca.transform(
       clustering.pad_seqs_to_matrix([s], max_seq_len)).flatten()
   # Get clustering results.
@@ -266,7 +262,7 @@ def main(unused_argv):
   if not os.path.exists(FLAGS.output_dir):
     os.mkdir(FLAGS.output_dir)
   combined_results_list = []
-  for _ in xrange(FLAGS.num_repeat):
+  for _ in range(FLAGS.num_repeat):
     results_df = get_results_bih_dataset(FLAGS.hdim, FLAGS.num_clusters)
     combined_results_list.append(results_df)
   results_df = pd.concat(combined_results_list)
