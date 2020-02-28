@@ -213,12 +213,12 @@ def get_results(sequences, num_clusters, guessed_hidden_dim, true_cluster_ids):
   """
   cluster_fns = {
       'true': (lambda a, n: true_cluster_ids),
-      #'kshape': kshape,
-      #'dtw': dtw_kmedoids,
-      #'pca': partial(pca_kmeans, hdim=guessed_hidden_dim),
+      'kshape': kshape,
+      'dtw': dtw_kmedoids,
+      'pca': partial(pca_kmeans, hdim=guessed_hidden_dim),
       'ar': partial(ar_kmeans, hdim=guessed_hidden_dim), 
       'arma_iter': partial(arma_iter_kmeans, hdim=guessed_hidden_dim),
-      #'lds_em': partial(lds_em_kmeans, hdim=guessed_hidden_dim),
+      'lds_em': partial(lds_em_kmeans, hdim=guessed_hidden_dim),
       'arma_mle': partial(arma_mle_kmeans, hdim=guessed_hidden_dim),
   }
   metric_fns_with_truth = {
