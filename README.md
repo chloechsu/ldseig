@@ -1,27 +1,29 @@
-This directory contains Python script to run linear dynamical system clustering
-experiments locally without dependencies on Google packages.
+## Code for paper ["Linear Dynamics: Clustering without identification"](https://arxiv.org/abs/1908.01039)
 
-## Installation
+### Installation
 
-The files in this directory are meant to be run as python scripts. To install
-dependencies, run `pip install -r requirements.txt` and additionally install the
-latest version of pybasicbayes from GitHub. If there are error messages
-related to the pylds package, do the following: 1. Install numpy through `pip
-install numpy` 2. Install Cython through `pip install Cython` 3. Remove pylds
-from the requirements file, and install the rest requirements `pip install -r
-requirements.txt` 4. Install pylds through `pip install pylds`
+The dependencies are documented in environment.yml and can be installed via conda.
+<pre><code>
+conda env create -f environment.yml
+conda activate lds
+</code></pre>
+For more details, see [conda documentation for creating an environment from yml file](https://docs.conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#creating-an-environment-from-an-environment-yml-file).
+If there is an error due to pybasicbayes and scipy version incompatibility, try installing the latest version of pybasicbayes from GitHub as the pip version might be outdated.
 
-## Example Usage
+### Simulated experiments for eigenvalue estimation
+To run the eigenvalue estimation experiments in the paper, use the following commands.
+<pre><code>
+python experiment_learn_eig.py --output_dir=eig_2d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=100 --hidden_dim=2 --output_noise_stddev=0.01
+python experiment_learn_eig.py --output_dir=eig_3d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=100 --hidden_dim=3 --output_noise_stddev=0.01
+python experiment_learn_eig.py --output_dir=eig_5d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=100 --hidden_dim=5 --output_noise_stddev=0.01
+python plot_eig_error.py
+</code></pre>
 
-Example to run experiments for learning eigenvalues: python
-experiment_learn_eig.py --output_dir=may11_eig_2d_test/ \
---min_seq_len=20 --max_seq_len=1000 --num_sampled_seq_len=2 \
---num_repeat=1 --hidden_dim=2 --true_eig=0.1,0.8
-
-Example to run experiments for running clustering experiments: python
-experiments.py --output_dir=may19_3d --hidden_state_dim=3 \
---min_seq_len=100 --max_seq_len=2000 --num_sampled_seq_len=20 \
---num_systems=100 --num_repeat=100 \
---cluster_center_dist_lower_bound=0.1 --hide_inputs=true
-
-For more information about the flags, please see documentation in the scripts.
+### Simulated experiments for clustering
+<pre><code>
+python experiments.py --output_dir=cluster_2d_2c --hidden_state_dim=2 --min_seq_len=1000 --max_seq_len=1000 --num_sampled_seq_len=1 --num_systems=100 --num_clusters=2 --num_repeat=100
+python experiments.py --output_dir=cluster_2d_3c --hidden_state_dim=2 --min_seq_len=1000 --max_seq_len=1000 --num_sampled_seq_len=1 --num_systems=100 --num_clusters=3 --num_repeat=100
+python experiments.py --output_dir=cluster_2d_5c --hidden_state_dim=2 --min_seq_len=1000 --max_seq_len=1000 --num_sampled_seq_len=1 --num_systems=100 --num_clusters=5 --num_repeat=100
+python experiments.py --output_dir=cluster_2d_10c --hidden_state_dim=2 --min_seq_len=1000 --max_seq_len=1000 --num_sampled_seq_len=1 --num_systems=100 --num_clusters=10 --num_repeat=100
+python agg_stats_to_table.py
+</code></pre>
