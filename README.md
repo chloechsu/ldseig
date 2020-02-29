@@ -13,9 +13,8 @@ If there is an error due to pybasicbayes and scipy version incompatibility, try 
 ### Simulated experiments for eigenvalue estimation
 To run the eigenvalue estimation experiments in the paper, use the following commands.
 <pre><code>
-python experiment_learn_eig.py --output_dir=eig_2d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=100 --hidden_dim=2 --output_noise_stddev=0.01
-python experiment_learn_eig.py --output_dir=eig_3d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=100 --hidden_dim=3 --output_noise_stddev=0.01
-python experiment_learn_eig.py --output_dir=eig_5d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=100 --hidden_dim=5 --output_noise_stddev=0.01
+python experiment_learn_eig.py --output_dir=eig_2d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=500 --hidden_dim=2 --output_noise_stddev=0.01
+python experiment_learn_eig.py --output_dir=eig_3d/ --min_seq_len=500 --max_seq_len=50000 --num_sampled_seq_len=5 --num_repeat=500 --hidden_dim=3 --output_noise_stddev=0.01
 python plot_eig_error.py
 </code></pre>
 
